@@ -1,3 +1,6 @@
+/-
+- [η](https://math.stackexchange.com/a/836124)
+-/
 import Kip.Prelude
 
 set_option autoImplicit false
@@ -112,6 +115,7 @@ inductive Jud.{u} (Var: Type u)
   | ctx
   | typ (A: Term Var)
   | var (a A: Term Var)
+  | typEq (A B: Term Var)
 
 universe u
 variable {Var: Type u} [DecidableEq Var]
@@ -120,36 +124,47 @@ namespace Jud
   inductive free (x: Var): Jud Var → Prop
     | typ {A: Term Var}: x ∈ A → free x (.typ A)
     | var {a: Term Var} (A: Term Var): x ∈ a → free x (.var a A)
-    | var_typ (a: Term Var) {A: Term Var}: x ∈ A → free x (.var a A)
+    | varTyp (a: Term Var) {A: Term Var}: x ∈ A → free x (.var a A)
+    | typEqL {A: Term Var} (B: Term Var): x ∈ A → free x (.typEq A B)
+    | typEqR (A: Term Var) {B: Term Var}: x ∈ B → free x (.typEq A B)
   instance: Membership Var (Jud Var) where mem := free
 
   instance freeDec (x: Var): (j: Jud Var) → Decidable (x ∈ j)
-    | ctx => isFalse fun h => nomatch h
-    | typ A => if h: x ∈ A then isTrue (.typ h) else isFalse fun | .typ h' => h h'
+    | ctx => isFalse (nomatch .)
+    | typ A =>
+      if hA: x ∈ A then isTrue (.typ hA)
+      else isFalse fun | .typ h => hA h
     | var a A =>
-      if h₁: x ∈ a then isTrue (.var A h₁)
-      else if h₂: x ∈ A then isTrue (.var_typ a h₂)
-      else isFalse fun | .var _ h => h₁ h | .var_typ _ h => h₂ h
+      if ha: x ∈ a then isTrue (.var A ha)
+      else if hA: x ∈ A then isTrue (.varTyp a hA)
+      else isFalse fun | .var _ h => ha h | .varTyp _ h => hA h
+    | typEq A B =>
+      if hA: x ∈ A then isTrue (.typEqL B hA)
+      else if hB: x ∈ B then isTrue (.typEqR A hB)
+      else isFalse fun | .typEqL _ h => hA h | .typEqR _ h => hB h
 end Jud
 
 inductive Seq: Ctx Var → Jud Var → Type _
+  /- Γ ⊢ .ctx -/
   | emp
     : Seq [] .ctx
   | ext {Γ: Ctx Var} {x: Var} {A: Term Var}
     : Seq Γ (.typ A) → (Γ.lookup x).isNone → Seq ((x, A)::Γ) .ctx
+  /- Γ ⊢ .typ A -/
   | pi {Γ: Ctx Var} {x: Var} {A B: Term Var}
     : Seq ((x, A)::Γ) (.typ B) → Seq Γ (.typ (.pi x A B))
+  /- Γ ⊢ .var a A -/
   | var {Γ: Ctx Var} {x: Var} {A: Term Var}
     : Seq Γ .ctx → (x, A) ∈ Γ → Seq Γ (.var x A)
+  /- Γ ⊢ .typEq A B -/
+  | trefl {Γ: Ctx Var} {A: Term Var}
+    : Seq Γ (.typ A) → Seq Γ (.typEq A A)
+  | piα {Γ: Ctx Var} {x y: Var} {A B: Term Var}
+    : Seq ((x, A)::Γ) (.typ B)
+    → Seq ((y, A)::Γ) .ctx
+    → Seq Γ (.typEq (.pi x A B) (.pi y A (B.subst y x)))
 
 infix:25 " ⊢ " => Seq
-
-def Seq.ctx_ok {Γ: Ctx Var} {j: Jud Var}
-  : Γ ⊢ j → Γ ⊢ .ctx
-  | σ@emp
-  | σ@(ext _ _) => σ
-  | pi σ => have .ext σ _ := σ.ctx_ok; σ.ctx_ok
-  | var σ _ => σ
 
 def Seq.ext_typ_ok {Γ: Ctx Var} {x: Var} {A: Term Var}
   : (x, A)::Γ ⊢ .ctx → Γ ⊢ .typ A
@@ -159,10 +174,24 @@ def Seq.ext_typ_ok {Γ: Ctx Var} {x: Var} {A: Term Var}
 --   : (x, A)::Γ ⊢ .ctx → Γ ⊢ .ctx
 --   | j => j.ext_typ_ok.ctx_ok
 
+protected def Seq.pi_ctx_ok {Γ: Ctx Var} {A: Term Var}
+  : Γ ⊢ .typ A → Γ ⊢ .ctx
+  | pi σ => have .ext σ _ := σ.pi_ctx_ok; σ.pi_ctx_ok
+
 def Seq.pi_typ_ok {Γ: Ctx Var} {x: Var} {A B: Term Var}
   : Γ ⊢ .typ (.pi x A B) → Γ ⊢ .typ A
-  | pi σ => have .ext σ _ := σ.ctx_ok; σ
+  | pi σ => have .ext σ _ := σ.pi_ctx_ok; σ
 
+def Seq.ctx_ok {Γ: Ctx Var} {j: Jud Var}
+  : Γ ⊢ j → Γ ⊢ .ctx
+  | σ@emp
+  | σ@(ext _ _)
+  | var σ _ => σ
+  | pi σ
+  | piα _ σ => have .ext σ _ := σ.ctx_ok; σ.ctx_ok
+  | trefl σ => σ.pi_ctx_ok
+
+/-
 theorem free_in_jud_of_free_in_ctx {Γ: Ctx Var} {j: Jud Var} {x: Var}
   : Γ ⊢ j → x ∈ j → (List.lookup x Γ).isSome
   | .pi σ, .typ h =>
@@ -173,7 +202,7 @@ theorem free_in_jud_of_free_in_ctx {Γ: Ctx Var} {j: Jud Var} {x: Var}
       have := free_in_jud_of_free_in_ctx σ (.typ h')
       (List.lookup_some this).elim (absurd . hn.symm) id
   | .var _ h, .var _ .var => List.lookup_of_mem h
-  | .var σ h, .var_typ _ h' => --suffices x ∈ Γ from List.lookup_of_mem this
+  | .var σ h, .varTyp _ h' => --suffices x ∈ Γ from List.lookup_of_mem this
     -- have := Seq.var σ h
     sorry
 
@@ -183,7 +212,7 @@ theorem var_ne_of_ext {Γ: Ctx Var} {x y: Var} {A B: Term Var}
 
 theorem free_in_typ_of_ext {x y: Var} {A B: Term Var}
   : {Γ: Ctx Var} → (x, A)::Γ ⊢ .ctx → (y, B) ∈ Γ → x ∉ B
-  | [], _, h, _ => nomatch h
+  -- | [], _, h, _ => nomatch h
   | _::Γ, .ext σ h, .head _, h' => by
     unfold List.lookup at h; split at h
     . exact nomatch h
@@ -192,7 +221,7 @@ theorem free_in_typ_of_ext {x y: Var} {A B: Term Var}
       exact not_some_none this h
   | γ::Γ, .ext σ h, .tail _ h', h'' =>
     have := .var σ.ctx_ok (.tail _ h')
-    have := free_in_jud_of_free_in_ctx this (.var_typ _ h'')
+    have := free_in_jud_of_free_in_ctx this (.varTyp _ h'')
     not_some_none this h
 
 theorem exchange {Γ: Ctx Var} {x y: Var} {A B: Term Var}
@@ -216,7 +245,11 @@ example {Γ: Ctx Var} {x: Var} {A: Term Var} {j: Jud Var}
 
 example {Γ: Ctx Var} {x: Var} {A: Term Var} {j: Jud Var}
   : Γ ⊢ j → (x, A)::Γ ⊢ .ctx → (x, A)::Γ ⊢ j
-  := sorry
+  | .emp, σ => σ
+  | .ext _ _, σ => σ
+  | .pi (x := y) (A := B) (B := C) σ, σ' =>
+    .pi sorry -- α-equivalence
+  | .var _ h, σ => .var σ (.tail _ h)
 
 theorem lookup_of_mem {x: Var} {A: Term Var}
   : {Γ: Ctx Var} → Γ ⊢ .ctx → (x, A) ∈ Γ → Γ.lookup x = some A
@@ -224,5 +257,5 @@ theorem lookup_of_mem {x: Var} {A: Term Var}
   | (y, B)::Γ, σ@(.ext σ' _), .tail _ h =>
     have h₂: (x == y) = false := decide_eq_false (var_ne_of_ext σ.ctx_ok h).symm
     by unfold List.lookup; simp [h₂]; exact lookup_of_mem σ'.ctx_ok h
-
+-/
 end MLTT
