@@ -19,14 +19,14 @@ def applyFallibleExcept (x y: Int): FallibleOp → Except String Int
 
 def applyOp {m} [Monad m] (applyFallible: Int → Int → FallibleOp → m Int) (x y: Int)
   : Binop FallibleOp → m Int
-  | .add => pure (x + y)
-  | .sub => pure (x - y)
-  | .mul => pure (x * y)
+  | .add => return x + y
+  | .sub => return x - y
+  | .mul => return x * y
   | .fallible op => applyFallible x y op
 
 def evaluateM {m} [Monad m] (applyFallible: Int → Int → FallibleOp → m Int)
   : Expr (Binop FallibleOp) → m Int
-  | .const value => pure value
+  | .const value => return value
   | .binop op left right => do
     let x ← evaluateM applyFallible left
     let y ← evaluateM applyFallible right
