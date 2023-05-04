@@ -12,22 +12,18 @@ def applyOpOption (x y: Int): Binop → Option Int
   | .mul => x * y
   | .div => if y = 0 then none else x / y
 
-def evaluateOption: Expr Binop → Option Int
-  | .const value => value
-  | .binop op left right =>
-    evaluateOption left >>= fun x =>
-    evaluateOption right >>= fun y =>
-    applyOpOption x y op
-
 def applyOpExcept (x y: Int): Binop → Except String Int
   | .add => .ok (x + y)
   | .sub => .ok (x - y)
   | .mul => .ok (x * y)
   | .div => if y = 0 then .error s!"Divide {x} by zero" else .ok (x / y)
 
-def evaluateExcept: Expr Binop → Except String Int
-  | .const value => .ok value
+def evaluateM {m} [Monad m] (applyOp: Int → Int → Binop → m Int): Expr Binop → m Int
+  | .const value => pure value
   | .binop op left right =>
-    evaluateExcept left >>= fun x =>
-    evaluateExcept right >>= fun y =>
-    applyOpExcept x y op
+    evaluateM applyOp left >>= fun x =>
+    evaluateM applyOp right >>= fun y =>
+    applyOp x y op
+
+def evaluateOption: Expr Binop → Option Int := evaluateM applyOpOption
+def evaluateExcept: Expr Binop → Except String Int := evaluateM applyOpExcept
