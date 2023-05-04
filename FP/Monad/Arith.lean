@@ -6,13 +6,15 @@ inductive Expr.{u} (Op: Type u)
 
 inductive Binop | add | sub | mul | div
 
+def applyOp (x y: Int): Binop → Option Int
+  | .add => x + y
+  | .sub => x - y
+  | .mul => x * y
+  | .div => if y = 0 then none else x / y
+
 def evaluateOption: Expr Binop → Option Int
   | .const value => value
   | .binop op left right =>
     evaluateOption left >>= fun x =>
     evaluateOption right >>= fun y =>
-    match op with
-    | .add => x + y
-    | .sub => x - y
-    | .mul => x * y
-    | .div => if y = 0 then none else x / y
+    applyOp x y op
