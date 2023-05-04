@@ -27,9 +27,9 @@ def applyOp {m} [Monad m] (applyFallible: Int → Int → FallibleOp → m Int) 
 def evaluateM {m} [Monad m] (applyFallible: Int → Int → FallibleOp → m Int)
   : Expr (Binop FallibleOp) → m Int
   | .const value => pure value
-  | .binop op left right =>
-    evaluateM applyFallible left >>= fun x =>
-    evaluateM applyFallible right >>= fun y =>
+  | .binop op left right => do
+    let x ← evaluateM applyFallible left
+    let y ← evaluateM applyFallible right
     applyOp applyFallible x y op
 
 def evaluateOption: Expr (Binop FallibleOp) → Option Int :=
