@@ -6,24 +6,24 @@ inductive Expr.{u} (Op: Type u)
 
 inductive Binop | add | sub | mul | div
 
-def applyOpOption (x y: Int): Binop → Option Int
-  | .add => x + y
-  | .sub => x - y
-  | .mul => x * y
-  | .div => if y = 0 then none else x / y
+def applyDivOption (x y: Int): Option Int :=
+  if y = 0 then none else x / y
 
-def applyOpExcept (x y: Int): Binop → Except String Int
-  | .add => .ok (x + y)
-  | .sub => .ok (x - y)
-  | .mul => .ok (x * y)
-  | .div => if y = 0 then .error s!"Divide {x} by zero" else .ok (x / y)
+def applyDivExcept (x y: Int): Except String Int :=
+  if y = 0 then .error s!"Divide {x} by zero" else .ok (x / y)
 
-def evaluateM {m} [Monad m] (applyOp: Int → Int → Binop → m Int): Expr Binop → m Int
+def applyOp {m} [Monad m] (applyDiv: Int → Int → m Int) (x y: Int): Binop → m Int
+  | .add => pure (x + y)
+  | .sub => pure (x - y)
+  | .mul => pure (x * y)
+  | .div => applyDiv x y
+
+def evaluateM {m} [Monad m] (applyDiv: Int → Int → m Int): Expr Binop → m Int
   | .const value => pure value
   | .binop op left right =>
-    evaluateM applyOp left >>= fun x =>
-    evaluateM applyOp right >>= fun y =>
-    applyOp x y op
+    evaluateM applyDiv left >>= fun x =>
+    evaluateM applyDiv right >>= fun y =>
+    applyOp applyDiv x y op
 
-def evaluateOption: Expr Binop → Option Int := evaluateM applyOpOption
-def evaluateExcept: Expr Binop → Except String Int := evaluateM applyOpExcept
+def evaluateOption: Expr Binop → Option Int := evaluateM applyDivOption
+def evaluateExcept: Expr Binop → Except String Int := evaluateM applyDivExcept
