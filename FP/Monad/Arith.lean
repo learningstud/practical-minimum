@@ -6,7 +6,7 @@ inductive Expr.{u} (Op: Type u)
 
 inductive Binop | add | sub | mul | div
 
-def applyOp (x y: Int): Binop → Option Int
+def applyOpOption (x y: Int): Binop → Option Int
   | .add => x + y
   | .sub => x - y
   | .mul => x * y
@@ -17,4 +17,17 @@ def evaluateOption: Expr Binop → Option Int
   | .binop op left right =>
     evaluateOption left >>= fun x =>
     evaluateOption right >>= fun y =>
-    applyOp x y op
+    applyOpOption x y op
+
+def applyOpExcept (x y: Int): Binop → Except String Int
+  | .add => .ok (x + y)
+  | .sub => .ok (x - y)
+  | .mul => .ok (x * y)
+  | .div => if y = 0 then .error s!"Divide {x} by zero" else .ok (x / y)
+
+def evaluateExcept: Expr Binop → Except String Int
+  | .const value => .ok value
+  | .binop op left right =>
+    evaluateExcept left >>= fun x =>
+    evaluateExcept right >>= fun y =>
+    applyOpExcept x y op
