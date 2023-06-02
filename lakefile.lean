@@ -8,3 +8,14 @@ require mathlib from git
 
 @[default_target]
 lean_lib PracticalMinimum
+
+lean_lib ApostolCalculus
+lean_lib Kip
+lean_lib Cmd
+lean_lib Cpp
+
+@[default_target]
+lean_exe cmd {
+  root := `Cmd
+  -- exeName
+}
