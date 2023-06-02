@@ -250,10 +250,10 @@ theorem eq_zero_of_lt_one: {a: ℕ} → a < 1 → a = 0
 /-! ## Predecessor -/
 
 #check Nat.pred
-protected def pred: ℕ → ℕ | 0 => 0 | succ a => a
+def pred: ℕ → ℕ | 0 => 0 | succ a => a
 
 #check Nat.pred_zero
-@[simp] theorem pred_zero: ℕ.pred 0 = 0 := rfl
+@[simp] theorem pred_zero: pred 0 = 0 := rfl
 
 #check Nat.pred_succ
 @[simp] theorem pred_succ (a: ℕ): a.succ.pred = a := rfl
@@ -298,6 +298,11 @@ protected theorem add_comm (a: ℕ): (b: ℕ) → a + b = b + a
   | 0 => a.zero_add.symm
   | succ b => (congrArg succ (a.add_comm b)).trans (b.succ_add a).symm
 
+#check Nat.add_assoc
+protected theorem add_assoc (a b: ℕ): (c: ℕ) → a + b + c = a + (b + c)
+  | 0 => rfl
+  | succ c => congrArg succ (ℕ.add_assoc a b c)
+
 #check Nat.mul
 protected def mul (a: ℕ): ℕ → ℕ | 0 => 0 | succ b => (a.mul b).add a
 instance: Mul ℕ where mul := ℕ.mul
@@ -312,8 +317,8 @@ instance: Pow ℕ ℕ where pow := ℕ.pow
 
 #check Nat.sub
 /-- Truncated subtraction (`∸`) -/
-protected def monus (a: ℕ): ℕ → ℕ | 0 => a | succ b => (a.monus b).pred
-@[inherit_doc] infixl:65 " ∸ "   => ℕ.monus
+def monus (a: ℕ): ℕ → ℕ | 0 => a | succ b => (a.monus b).pred
+@[inherit_doc] infixl:65 " ∸ "   => monus
 
 #check Nat.sub_zero
 @[simp] theorem monus_zero (a: ℕ): a ∸ 0 = a := rfl
@@ -321,7 +326,7 @@ protected def monus (a: ℕ): ℕ → ℕ | 0 => a | succ b => (a.monus b).pred
 #check Nat.zero_sub
 @[simp] theorem zero_monus: (a: ℕ) → 0 ∸ a = 0
   | 0 => rfl
-  | succ a => congrArg ℕ.pred a.zero_monus
+  | succ a => congrArg pred a.zero_monus
 
 theorem monus_succ (a b: ℕ): a ∸ b.succ = (a ∸ b).pred := rfl
 
@@ -329,7 +334,7 @@ theorem monus_succ (a b: ℕ): a ∸ b.succ = (a ∸ b).pred := rfl
 #check Nat.succ_sub_succ
 theorem succ_monus_succ (a: ℕ): (b: ℕ) → a.succ ∸ b.succ = a ∸ b
   | 0 => rfl
-  | succ b => congrArg ℕ.pred (a.succ_monus_succ b)
+  | succ b => congrArg pred (a.succ_monus_succ b)
 
 #check Nat.sub_self
 @[simp] theorem monus_self: (a: ℕ) → a ∸ a = 0
@@ -339,7 +344,7 @@ theorem succ_monus_succ (a: ℕ): (b: ℕ) → a.succ ∸ b.succ = a ∸ b
 #check Nat.sub_eq_zero_of_le
 theorem monus_eq_zero_of_le {a b: ℕ}: a ≤ b → a ∸ b = 0
   | .refl => a.monus_self
-  | .step h => congrArg ℕ.pred (monus_eq_zero_of_le h)
+  | .step h => congrArg pred (monus_eq_zero_of_le h)
 
 #check Nat.sub_le
 theorem monus_le (a: ℕ): (b: ℕ) → a ∸ b ≤ a
